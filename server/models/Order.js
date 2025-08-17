@@ -10,10 +10,9 @@ const orderSchema = new mongoose.Schema({
     type: String,
     required: true
   },
-  companyName: String,
   type: {
     type: String,
-    enum: ['BUY', 'SELL'],
+    enum: ['buy', 'sell'],
     required: true
   },
   quantity: {
@@ -24,17 +23,15 @@ const orderSchema = new mongoose.Schema({
     type: Number,
     required: true
   },
-  orderType: {
-    type: String,
-    enum: ['MARKET', 'LIMIT'],
-    default: 'MARKET'
+  total: {
+    type: Number,
+    required: true
   },
   status: {
     type: String,
-    enum: ['PENDING', 'EXECUTED', 'CANCELLED'],
-    default: 'EXECUTED'
-  },
-  totalAmount: Number
+    enum: ['completed', 'pending', 'cancelled'],
+    default: 'completed'
+  }
 }, {
   timestamps: true
 });
