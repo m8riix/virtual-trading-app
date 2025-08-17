@@ -49,61 +49,63 @@ router.post('/', authenticateToken, async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    const totalCost = price * quantity;
+    const totalCost = parseFloat(price) * parseInt(quantity);
 
-if (type === 'buy') {
-  // Check balance
-  if (user.balance < totalCost) {
-    return res.status(400).json({ message: 'Insufficient balance' });
-  }
+    if (type === 'buy') {
+      // Check balance
+      if (user.balance < totalCost) {
+        return res.status(400).json({ message: 'Insufficient balance' });
+      }
 
-  // Deduct balance
-  user.balance -= totalCost;
+      // Deduct balance
+      user.balance -= totalCost;
 
-  // Initialize portfolio if it doesn't exist
-  if (!user.portfolio) {
-    user.portfolio = [];
-  }
-
-  // Update portfolio - FIXED: Ensure buyPrice is always set
-  let holding = user.portfolio.find(h => h.symbol === symbol);
-  if (holding) {
-    // Update existing holding
-    const currentTotal = (holding.buyPrice * holding.quantity) + totalCost;
-    const newQuantity = holding.quantity + quantity;
-    holding.buyPrice = currentTotal / newQuantity; // Average price
-    holding.quantity = newQuantity;
-    holding.currentPrice = price;
-  } else {
-    // Create new holding - FIXED: Explicitly set all required fields
-    const newHolding = {
-      symbol: symbol,
-      quantity: parseInt(quantity),
-      buyPrice: parseFloat(price),
-      currentPrice: parseFloat(price)
-    };
-    console.log('Creating new portfolio holding:', newHolding);
-    user.portfolio.push(newHolding);
-  }
-} else {
-      // Sell logic
+      // Initialize portfolio if it doesn't exist
       if (!user.portfolio) {
+        user.portfolio = [];
+      }
+
+      // Update portfolio
+      let holding = user.portfolio.find(h => h.symbol === symbol);
+      if (holding) {
+        // Update existing holding
+        const currentTotal = (holding.buyPrice * holding.quantity) + totalCost;
+        const newQuantity = holding.quantity + parseInt(quantity);
+        holding.buyPrice = currentTotal / newQuantity;
+        holding.quantity = newQuantity;
+        holding.currentPrice = parseFloat(price);
+        console.log('Updated existing holding:', holding);
+      } else {
+        // Create new holding
+        const newHolding = {
+          symbol: symbol,
+          quantity: parseInt(quantity),
+          buyPrice: parseFloat(price),
+          currentPrice: parseFloat(price)
+        };
+        console.log('Creating new portfolio holding:', newHolding);
+        user.portfolio.push(newHolding);
+      }
+    } else {
+      // Sell logic
+      if (!user.portfolio || user.portfolio.length === 0) {
         return res.status(400).json({ message: 'No holdings to sell' });
       }
 
       const holding = user.portfolio.find(h => h.symbol === symbol);
-      if (!holding || holding.quantity < quantity) {
+      if (!holding || holding.quantity < parseInt(quantity)) {
         return res.status(400).json({ message: 'Not enough shares to sell' });
       }
 
-      if (holding.quantity === quantity) {
+      if (holding.quantity === parseInt(quantity)) {
         user.portfolio = user.portfolio.filter(h => h.symbol !== symbol);
       } else {
-        holding.quantity -= quantity;
+        holding.quantity -= parseInt(quantity);
       }
       user.balance += totalCost;
     }
 
+    console.log('Saving user with portfolio:', user.portfolio);
     await user.save();
 
     // Create order record
@@ -111,14 +113,13 @@ if (type === 'buy') {
       userId: req.userId,
       symbol,
       type,
-      quantity,
-      price,
+      quantity: parseInt(quantity),
+      price: parseFloat(price),
       total: totalCost,
       status: 'completed'
     });
 
     await order.save();
-
     console.log('Order saved successfully:', order);
 
     res.status(201).json({ 
@@ -127,8 +128,8 @@ if (type === 'buy') {
         id: order._id,
         symbol,
         type,
-        quantity,
-        price,
+        quantity: parseInt(quantity),
+        price: parseFloat(price),
         total: totalCost,
         status: 'completed'
       },
@@ -168,4 +169,3 @@ router.get('/', authenticateToken, async (req, res) => {
 });
 
 module.exports = router;
-
