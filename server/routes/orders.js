@@ -31,7 +31,7 @@ router.post('/', authenticateToken, async (req, res) => {
 
     const { symbol, type, quantity, price } = req.body;
 
-    // Validation
+    // Strict validation
     if (!symbol || !type || !quantity || !price) {
       return res.status(400).json({ message: 'Missing required fields' });
     }
@@ -40,8 +40,15 @@ router.post('/', authenticateToken, async (req, res) => {
       return res.status(400).json({ message: 'Invalid order type' });
     }
 
-    if (quantity <= 0) {
-      return res.status(400).json({ message: 'Quantity must be positive' });
+    const qty = Number(quantity);
+    const prc = Number(price);
+
+    if (isNaN(qty) || qty <= 0) {
+      return res.status(400).json({ message: 'Invalid quantity' });
+    }
+
+    if (isNaN(prc) || prc <= 0) {
+      return res.status(400).json({ message: 'Invalid price' });
     }
 
     const user = await User.findById(req.userId);
@@ -49,7 +56,7 @@ router.post('/', authenticateToken, async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    const totalCost = parseFloat(price) * parseInt(quantity);
+    const totalCost = prc * qty;
 
     if (type === 'buy') {
       // Check balance
@@ -60,67 +67,80 @@ router.post('/', authenticateToken, async (req, res) => {
       // Deduct balance
       user.balance -= totalCost;
 
-      // Initialize portfolio if it doesn't exist
-      if (!user.portfolio) {
+      // Initialize portfolio array if needed
+      if (!Array.isArray(user.portfolio)) {
         user.portfolio = [];
       }
 
-      // Update portfolio
-      let holding = user.portfolio.find(h => h.symbol === symbol);
-      if (holding) {
+      // Find existing holding
+      const existingIndex = user.portfolio.findIndex(h => h.symbol === symbol);
+      
+      if (existingIndex >= 0) {
         // Update existing holding
+        const holding = user.portfolio[existingIndex];
         const currentTotal = (holding.buyPrice * holding.quantity) + totalCost;
-        const newQuantity = holding.quantity + parseInt(quantity);
-        holding.buyPrice = currentTotal / newQuantity;
-        holding.quantity = newQuantity;
-        holding.currentPrice = parseFloat(price);
-        console.log('Updated existing holding:', holding);
-      } else {
-        // Create new holding
-        const newHolding = {
+        const newQuantity = holding.quantity + qty;
+        
+        user.portfolio[existingIndex] = {
           symbol: symbol,
-          quantity: parseInt(quantity),
-          buyPrice: parseFloat(price),
-          currentPrice: parseFloat(price)
+          quantity: newQuantity,
+          buyPrice: currentTotal / newQuantity,
+          currentPrice: prc
         };
+        
+        console.log('Updated existing holding:', user.portfolio[existingIndex]);
+      } else {
+        // Create new holding with explicit field assignment
+        const newHolding = {
+          symbol: String(symbol),
+          quantity: Number(qty),
+          buyPrice: Number(prc),
+          currentPrice: Number(prc)
+        };
+        
         console.log('Creating new portfolio holding:', newHolding);
+        console.log('buyPrice type:', typeof newHolding.buyPrice, 'value:', newHolding.buyPrice);
+        
         user.portfolio.push(newHolding);
       }
     } else {
       // Sell logic
-      if (!user.portfolio || user.portfolio.length === 0) {
+      if (!Array.isArray(user.portfolio) || user.portfolio.length === 0) {
         return res.status(400).json({ message: 'No holdings to sell' });
       }
 
-      const holding = user.portfolio.find(h => h.symbol === symbol);
-      if (!holding || holding.quantity < parseInt(quantity)) {
+      const holdingIndex = user.portfolio.findIndex(h => h.symbol === symbol);
+      if (holdingIndex === -1 || user.portfolio[holdingIndex].quantity < qty) {
         return res.status(400).json({ message: 'Not enough shares to sell' });
       }
 
-      if (holding.quantity === parseInt(quantity)) {
-        user.portfolio = user.portfolio.filter(h => h.symbol !== symbol);
+      if (user.portfolio[holdingIndex].quantity === qty) {
+        user.portfolio.splice(holdingIndex, 1);
       } else {
-        holding.quantity -= parseInt(quantity);
+        user.portfolio[holdingIndex].quantity -= qty;
       }
       user.balance += totalCost;
     }
 
-    console.log('Saving user with portfolio:', user.portfolio);
+    console.log('Final portfolio before save:', JSON.stringify(user.portfolio, null, 2));
+
+    // Save user with validation
     await user.save();
+    console.log('User saved successfully');
 
     // Create order record
     const order = new Order({
       userId: req.userId,
       symbol,
       type,
-      quantity: parseInt(quantity),
-      price: parseFloat(price),
+      quantity: qty,
+      price: prc,
       total: totalCost,
       status: 'completed'
     });
 
     await order.save();
-    console.log('Order saved successfully:', order);
+    console.log('Order saved successfully:', order._id);
 
     res.status(201).json({
       message: 'Order placed successfully',
@@ -128,8 +148,8 @@ router.post('/', authenticateToken, async (req, res) => {
         id: order._id,
         symbol,
         type,
-        quantity: parseInt(quantity),
-        price: parseFloat(price),
+        quantity: qty,
+        price: prc,
         total: totalCost,
         status: 'completed'
       },
@@ -138,6 +158,7 @@ router.post('/', authenticateToken, async (req, res) => {
 
   } catch (err) {
     console.error('Order placement error:', err);
+    console.error('Error stack:', err.stack);
     res.status(500).json({ message: 'Internal server error: ' + err.message });
   }
 });
