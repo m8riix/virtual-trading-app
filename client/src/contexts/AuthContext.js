@@ -19,7 +19,6 @@ export const AuthProvider = ({ children }) => {
     const token = localStorage.getItem('token');
     if (token) {
       axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-      // Verify token validity
       fetchUser();
     } else {
       setLoading(false);
@@ -45,18 +44,17 @@ export const AuthProvider = ({ children }) => {
     localStorage.setItem('token', token);
     axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
     setUser(user);
-    
     return user;
   };
 
   const register = async (name, email, password) => {
+    console.log('Making registration request to:', axios.defaults.baseURL + '/api/auth/register');
     const response = await axios.post('/api/auth/register', { name, email, password });
     const { token, user } = response.data;
     
     localStorage.setItem('token', token);
     axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
     setUser(user);
-    
     return user;
   };
 
