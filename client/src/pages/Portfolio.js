@@ -8,6 +8,7 @@ const Portfolio = () => {
   const { user } = useAuth();
   const [portfolio, setPortfolio] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     fetchPortfolio();
@@ -15,11 +16,15 @@ const Portfolio = () => {
 
   const fetchPortfolio = async () => {
     try {
+      console.log('Fetching portfolio...');
       const response = await axios.get('/api/portfolio');
-      setPortfolio(response.data);
+      console.log('Portfolio response:', response.data);
+      setPortfolio(response.data || []);
+      setError(null);
     } catch (error) {
-      console.error('Error fetching portfolio:', error);
-      // Mock data for demonstration
+      console.error('Portfolio fetch error:', error);
+      setError(error.message);
+      // Set mock data for demonstration
       setPortfolio([
         {
           symbol: 'RELIANCE',
@@ -31,17 +36,6 @@ const Portfolio = () => {
           totalInvestment: 24000,
           gain: 567.50,
           gainPercentage: 2.36
-        },
-        {
-          symbol: 'TCS',
-          name: 'Tata Consultancy Services',
-          quantity: 5,
-          buyPrice: 3250,
-          currentPrice: 3234.50,
-          totalValue: 16172.50,
-          totalInvestment: 16250,
-          gain: -77.50,
-          gainPercentage: -0.48
         }
       ]);
     } finally {
@@ -59,19 +53,24 @@ const Portfolio = () => {
     }
   };
 
-  const totalValue = portfolio.reduce((sum, item) => sum + item.totalValue, 0);
-  const totalInvestment = portfolio.reduce((sum, item) => sum + item.totalInvestment, 0);
+  const totalValue = portfolio.reduce((sum, item) => sum + (item.totalValue || 0), 0);
+  const totalInvestment = portfolio.reduce((sum, item) => sum + (item.totalInvestment || 0), 0);
   const totalGain = totalValue - totalInvestment;
   const totalGainPercentage = totalInvestment > 0 ? (totalGain / totalInvestment) * 100 : 0;
 
+  // Show loading state
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-600 via-purple-600 to-cyan-500 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-16 w-16 border-4 border-white border-t-transparent"></div>
+      <div className="min-h-screen bg-gradient-to-br from-blue-600 via-purple-600 to-cyan-500 flex items-center justify-center pt-20">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-4 border-white border-t-transparent mx-auto mb-4"></div>
+          <p className="text-white text-lg">Loading your portfolio...</p>
+        </div>
       </div>
     );
   }
 
+  // Main portfolio page
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-600 via-purple-600 to-cyan-500 pt-20 pb-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -79,6 +78,11 @@ const Portfolio = () => {
         <div className="mb-8">
           <h1 className="text-4xl font-bold text-white mb-2">Portfolio</h1>
           <p className="text-xl text-blue-100">Track your investments and performance</p>
+          {error && (
+            <div className="mt-2 p-3 bg-red-500 bg-opacity-20 border border-red-400 rounded-lg">
+              <p className="text-red-200 text-sm">Note: Using demo data due to API issue</p>
+            </div>
+          )}
         </div>
 
         {/* Portfolio Summary */}
@@ -94,7 +98,7 @@ const Portfolio = () => {
           <div className="bg-gray-800 bg-opacity-40 backdrop-blur-sm rounded-2xl shadow-2xl p-6 border border-gray-600 border-opacity-30">
             <p className="text-sm font-medium text-gray-300 mb-1">Total Gain/Loss</p>
             <p className={`text-2xl font-bold ${totalGain >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-              {totalGain >= 0 ? '+' : ''}₹{totalGain.toLocaleString()}
+              {totalGain >= 0 ? '+' : ''}₹{Math.abs(totalGain).toLocaleString()}
             </p>
           </div>
           <div className="bg-gray-800 bg-opacity-40 backdrop-blur-sm rounded-2xl shadow-2xl p-6 border border-gray-600 border-opacity-30">
@@ -151,15 +155,15 @@ const Portfolio = () => {
                         </div>
                       </td>
                       <td className="px-6 py-4 text-sm text-white">{holding.quantity}</td>
-                      <td className="px-6 py-4 text-sm text-white">₹{holding.buyPrice.toLocaleString()}</td>
-                      <td className="px-6 py-4 text-sm text-white">₹{holding.currentPrice.toLocaleString()}</td>
-                      <td className="px-6 py-4 text-sm text-white">₹{holding.totalValue.toLocaleString()}</td>
+                      <td className="px-6 py-4 text-sm text-white">₹{holding.buyPrice?.toLocaleString() || 0}</td>
+                      <td className="px-6 py-4 text-sm text-white">₹{holding.currentPrice?.toLocaleString() || 0}</td>
+                      <td className="px-6 py-4 text-sm text-white">₹{holding.totalValue?.toLocaleString() || 0}</td>
                       <td className="px-6 py-4">
-                        <div className={`text-sm font-medium ${holding.gain >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                          {holding.gain >= 0 ? '+' : ''}₹{holding.gain.toLocaleString()}
+                        <div className={`text-sm font-medium ${(holding.gain || 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                          {(holding.gain || 0) >= 0 ? '+' : ''}₹{Math.abs(holding.gain || 0).toLocaleString()}
                         </div>
-                        <div className={`text-xs ${holding.gain >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                          {holding.gain >= 0 ? '+' : ''}{holding.gainPercentage.toFixed(2)}%
+                        <div className={`text-xs ${(holding.gain || 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                          {(holding.gain || 0) >= 0 ? '+' : ''}{(holding.gainPercentage || 0).toFixed(2)}%
                         </div>
                       </td>
                       <td className="px-6 py-4">
