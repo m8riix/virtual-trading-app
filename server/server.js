@@ -33,8 +33,8 @@ mongoose.connect(process.env.MONGODB_URI, {
 
 // Root route for health check
 app.get('/', (req, res) => {
-  res.json({ 
-    message: 'Virtual Trading Backend API is running!', 
+  res.json({
+    message: 'Virtual Trading Backend API is running!',
     status: 'success',
     endpoints: ['/api/auth', '/api/stocks', '/api/portfolio', '/api/orders', '/api/watchlist']
   });
