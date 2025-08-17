@@ -12,11 +12,6 @@ import Watchlist from './pages/Watchlist';
 import Orders from './pages/Orders';
 import StockDetails from './pages/StockDetails';
 import AuthSuccess from './pages/AuthSuccess';
-import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { Toaster } from 'react-hot-toast';
-import { AuthProvider } from './contexts/AuthContext';
-import { useAuth } from './contexts/AuthContext';
 import axios from 'axios';
 
 // ⭐ ADD THIS LINE - Configure API base URL  
@@ -103,4 +98,5 @@ function App() {
 }
 
 export default App;
+
 
