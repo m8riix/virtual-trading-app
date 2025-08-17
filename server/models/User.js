@@ -1,51 +1,26 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
+const portfolioSchema = new mongoose.Schema({
+  symbol: { type: String, required: true },
+  quantity: { type: Number, required: true },
+  buyPrice: { type: Number, required: true },
+  currentPrice: { type: Number, default: 0 }
+});
+
 const userSchema = new mongoose.Schema({
-  name: {
-    type: String,
-    required: true
-  },
-  email: {
-    type: String,
-    required: true,
-    unique: true
-  },
-  password: {
-    type: String,
-    required: function() { return !this.googleId; }
-  },
-  googleId: {
-    type: String,
-    sparse: true
-  },
-  avatar: String,
-  balance: {
-    type: Number,
-    default: 1000000 // 10 Lakh virtual money
-  },
-  portfolio: [{
-    symbol: String,
-    companyName: String,
-    quantity: Number,
-    avgPrice: Number,
-    currentPrice: Number
-  }],
-  watchlist: [{
-    symbol: String,
-    companyName: String,
-    addedAt: {
-      type: Date,
-      default: Date.now
-    }
-  }]
+  name: { type: String, required: true },
+  email: { type: String, required: true, unique: true },
+  password: { type: String, required: true },
+  balance: { type: Number, default: 1000000 }, // 10 lakh virtual money
+  portfolio: [portfolioSchema]
 }, {
   timestamps: true
 });
 
 userSchema.pre('save', async function(next) {
   if (!this.isModified('password')) return next();
-  this.password = await bcrypt.hash(this.password, 12);
+  this.password = await bcrypt.hash(this.password, 10);
   next();
 });
 
