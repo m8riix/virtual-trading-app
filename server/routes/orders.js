@@ -122,8 +122,8 @@ router.post('/', authenticateToken, async (req, res) => {
     await order.save();
     console.log('Order saved successfully:', order);
 
-    res.status(201).json({ 
-      message: 'Order placed successfully', 
+    res.status(201).json({
+      message: 'Order placed successfully',
       order: {
         id: order._id,
         symbol,
@@ -133,7 +133,7 @@ router.post('/', authenticateToken, async (req, res) => {
         total: totalCost,
         status: 'completed'
       },
-      newBalance: user.balance 
+      newBalance: user.balance
     });
 
   } catch (err) {
