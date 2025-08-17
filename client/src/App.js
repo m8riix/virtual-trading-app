@@ -14,8 +14,9 @@ import StockDetails from './pages/StockDetails';
 import AuthSuccess from './pages/AuthSuccess';
 import axios from 'axios';
 
-// Configure API base URL
+// Configure axios
 axios.defaults.baseURL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+axios.defaults.withCredentials = true;
 
 // Debug logging
 console.log('REACT_APP_API_URL:', process.env.REACT_APP_API_URL);
