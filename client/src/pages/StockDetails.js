@@ -52,32 +52,43 @@ const StockDetails = () => {
     }
   };
 
-  const handleOrder = async () => {
-    if (quantity <= 0) {
-      toast.error('Please enter a valid quantity');
-      return;
-    }
+const handleOrder = async () => {
+  if (quantity <= 0) {
+    toast.error('Please enter a valid quantity');
+    return;
+  }
 
-    const totalCost = stock.price * quantity;
-    if (orderType === 'buy' && totalCost > user?.balance) {
-      toast.error('Insufficient balance');
-      return;
-    }
+  const totalCost = stock.price * quantity;
+  if (orderType === 'buy' && totalCost > user?.balance) {
+    toast.error('Insufficient balance');
+    return;
+  }
 
-    try {
-      await axios.post('/api/orders', {
-        symbol: stock.symbol,
-        type: orderType,
-        quantity: parseInt(quantity),
-        price: stock.price
-      });
-      
-      toast.success(`${orderType === 'buy' ? 'Bought' : 'Sold'} ${quantity} shares of ${stock.symbol}`);
-      setQuantity(1);
-    } catch (error) {
-      toast.error(`Error placing ${orderType} order`);
-    }
-  };
+  try {
+    console.log('Placing order:', {
+      symbol: stock.symbol,
+      type: orderType,
+      quantity: parseInt(quantity),
+      price: stock.price
+    });
+
+    const response = await axios.post('/api/orders', {
+      symbol: stock.symbol,
+      type: orderType,
+      quantity: parseInt(quantity),
+      price: stock.price
+    });
+    
+    console.log('Order response:', response.data);
+    toast.success(`${orderType === 'buy' ? 'Bought' : 'Sold'} ${quantity} shares of ${stock.symbol}`);
+    setQuantity(1);
+  } catch (error) {
+    console.error('Order error:', error.response?.data || error.message);
+    const errorMessage = error.response?.data?.message || `Error placing ${orderType} order`;
+    toast.error(errorMessage);
+  }
+};
+
 
   const addToWatchlist = async () => {
     try {
@@ -318,3 +329,4 @@ const StockDetails = () => {
 };
 
 export default StockDetails;
+
