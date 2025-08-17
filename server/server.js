@@ -42,6 +42,7 @@ app.get('/', (req, res) => {
   });
 });
 // Routes
+// Routes
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/stocks', require('./routes/stocks'));
 app.use('/api/portfolio', require('./routes/portfolio'));
@@ -50,5 +51,6 @@ app.use('/api/watchlist', require('./routes/watchlist'));
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+
 
 
