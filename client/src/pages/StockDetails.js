@@ -1,7 +1,18 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { createChart } from 'lightweight-charts';
+import {
+  ComposedChart,
+  Bar,
+  Line,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  ReferenceLine
+} from 'recharts';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 
@@ -9,10 +20,6 @@ const StockDetails = () => {
   const { symbol } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const chartContainerRef = useRef();
-  const chart = useRef();
-  const candlestickSeries = useRef();
-  const volumeSeries = useRef();
   
   const [stock, setStock] = useState(null);
   const [chartData, setChartData] = useState([]);
@@ -20,28 +27,13 @@ const StockDetails = () => {
   const [error, setError] = useState(null);
   const [quantity, setQuantity] = useState(1);
   const [orderType, setOrderType] = useState('buy');
-  const [timeframe, setTimeframe] = useState('1D');
-  const [indicators, setIndicators] = useState({
-    sma: false,
-    ema: false,
-    rsi: false
-  });
+  const [timeframe, setTimeframe] = useState('1M');
+  const [chartType, setChartType] = useState('candlestick');
 
   useEffect(() => {
     fetchStockDetails();
     fetchChartData();
   }, [symbol, timeframe]);
-
-  useEffect(() => {
-    if (chartContainerRef.current && chartData.length > 0) {
-      initializeChart();
-    }
-    return () => {
-      if (chart.current) {
-        chart.current.remove();
-      }
-    };
-  }, [chartData]);
 
   const fetchStockDetails = async () => {
     try {
@@ -50,18 +42,19 @@ const StockDetails = () => {
       setError(null);
     } catch (error) {
       console.error('Error fetching stock details:', error);
-      setError(error.response?.data?.message || 'Stock not found');
       
       // Mock data for demonstration
+      const basePrice = 2400 + Math.random() * 200;
+      const change = Math.random() * 60 - 30;
       setStock({
         symbol: symbol,
         name: `${symbol} Limited`,
-        price: 2456.75 + Math.random() * 100 - 50,
-        change: Math.random() * 40 - 20,
-        changePercent: Math.random() * 2 - 1,
-        open: 2445.20,
-        high: 2465.90,
-        low: 2440.20,
+        price: basePrice,
+        change: change,
+        changePercent: (change / basePrice) * 100,
+        open: basePrice - 10,
+        high: basePrice + 25,
+        low: basePrice - 15,
         volume: '2.5M',
         marketCap: '16,50,000 Cr',
         pe: 23.4,
@@ -71,129 +64,52 @@ const StockDetails = () => {
     }
   };
 
-  const fetchChartData = async () => {
-    try {
-      // Mock chart data - replace with real API
-      const mockData = generateMockChartData();
-      setChartData(mockData);
-    } catch (error) {
-      console.error('Error fetching chart data:', error);
-      const mockData = generateMockChartData();
-      setChartData(mockData);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const generateMockChartData = () => {
+  const fetchChartData = () => {
+    // Generate realistic mock chart data
     const data = [];
     const basePrice = 2400;
     let currentPrice = basePrice;
     const now = new Date();
     
-    for (let i = 90; i >= 0; i--) {
+    const days = timeframe === '1D' ? 1 : timeframe === '1W' ? 7 : timeframe === '1M' ? 30 : 365;
+    
+    for (let i = days; i >= 0; i--) {
       const date = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
-      const timestamp = Math.floor(date.getTime() / 1000);
       
-      const change = (Math.random() - 0.5) * 40;
-      currentPrice += change;
+      // Realistic price movement
+      const trend = Math.sin(i * 0.1) * 5; // Trending component
+      const noise = (Math.random() - 0.5) * 20; // Random noise
+      currentPrice += trend + noise;
       
       const open = currentPrice;
-      const close = currentPrice + (Math.random() - 0.5) * 20;
-      const high = Math.max(open, close) + Math.random() * 15;
-      const low = Math.min(open, close) - Math.random() * 15;
-      const volume = Math.floor(Math.random() * 1000000) + 500000;
+      const close = currentPrice + (Math.random() - 0.5) * 15;
+      const high = Math.max(open, close) + Math.random() * 12;
+      const low = Math.min(open, close) - Math.random() * 12;
+      const volume = Math.floor(Math.random() * 800000) + 200000;
+      
+      // Technical indicators
+      const sma20 = currentPrice + (Math.random() - 0.5) * 10;
+      const rsi = 30 + Math.random() * 40; // RSI between 30-70
       
       data.push({
-        time: timestamp,
+        date: date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }),
+        timestamp: date.getTime(),
         open: parseFloat(open.toFixed(2)),
         high: parseFloat(high.toFixed(2)),
         low: parseFloat(low.toFixed(2)),
         close: parseFloat(close.toFixed(2)),
-        volume: volume
+        volume: volume,
+        sma20: parseFloat(sma20.toFixed(2)),
+        rsi: parseFloat(rsi.toFixed(1)),
+        // Candlestick colors
+        fill: close >= open ? '#00D4AA' : '#FF4976'
       });
       
       currentPrice = close;
     }
     
-    return data;
-  };
-
-  const initializeChart = () => {
-    if (chart.current) {
-      chart.current.remove();
-    }
-
-    chart.current = createChart(chartContainerRef.current, {
-      width: chartContainerRef.current.clientWidth,
-      height: 400,
-      layout: {
-        background: { type: 'solid', color: 'transparent' },
-        textColor: '#ffffff',
-      },
-      grid: {
-        vertLines: { color: 'rgba(255, 255, 255, 0.1)' },
-        horzLines: { color: 'rgba(255, 255, 255, 0.1)' },
-      },
-      crosshair: {
-        mode: 1,
-      },
-      priceScale: {
-        borderColor: 'rgba(255, 255, 255, 0.2)',
-      },
-      timeScale: {
-        borderColor: 'rgba(255, 255, 255, 0.2)',
-        timeVisible: true,
-        secondsVisible: false,
-      },
-    });
-
-    // Add candlestick series
-    candlestickSeries.current = chart.current.addCandlestickSeries({
-      upColor: '#00D4AA',
-      downColor: '#FF4976',
-      borderDownColor: '#FF4976',
-      borderUpColor: '#00D4AA',
-      wickDownColor: '#FF4976',
-      wickUpColor: '#00D4AA',
-    });
-
-    // Add volume series
-    volumeSeries.current = chart.current.addHistogramSeries({
-      color: 'rgba(76, 175, 80, 0.5)',
-      priceFormat: {
-        type: 'volume',
-      },
-      priceScaleId: '',
-    });
-
-    // Set data
-    const candleData = chartData.map(item => ({
-      time: item.time,
-      open: item.open,
-      high: item.high,
-      low: item.low,
-      close: item.close,
-    }));
-
-    const volumeData = chartData.map(item => ({
-      time: item.time,
-      value: item.volume,
-      color: item.close >= item.open ? 'rgba(76, 175, 80, 0.5)' : 'rgba(255, 82, 82, 0.5)',
-    }));
-
-    candlestickSeries.current.setData(candleData);
-    volumeSeries.current.setData(volumeData);
-
-    // Handle resize
-    const handleResize = () => {
-      chart.current.applyOptions({
-        width: chartContainerRef.current.clientWidth,
-      });
-    };
-
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    setChartData(data);
+    setLoading(false);
   };
 
   const handleOrder = async () => {
@@ -224,31 +140,32 @@ const StockDetails = () => {
     }
   };
 
+  // Custom tooltip for charts
+  const CustomTooltip = ({ active, payload, label }) => {
+    if (active && payload && payload.length) {
+      const data = payload[0].payload;
+      return (
+        <div className="bg-gray-800 bg-opacity-95 p-4 rounded-lg border border-gray-600 shadow-lg">
+          <p className="text-white font-semibold mb-2">{label}</p>
+          <div className="space-y-1 text-sm">
+            <p className="text-gray-300">Open: <span className="text-white">₹{data.open}</span></p>
+            <p className="text-gray-300">High: <span className="text-green-400">₹{data.high}</span></p>
+            <p className="text-gray-300">Low: <span className="text-red-400">₹{data.low}</span></p>
+            <p className="text-gray-300">Close: <span className="text-white">₹{data.close}</span></p>
+            <p className="text-gray-300">Volume: <span className="text-blue-400">{data.volume.toLocaleString()}</span></p>
+          </div>
+        </div>
+      );
+    }
+    return null;
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-600 via-purple-600 to-cyan-500 flex items-center justify-center pt-20">
         <div className="text-center">
           <div className="animate-spin rounded-full h-16 w-16 border-4 border-white border-t-transparent mx-auto mb-4"></div>
           <p className="text-white text-lg">Loading charts...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (error && !stock) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-600 via-purple-600 to-cyan-500 flex items-center justify-center pt-20">
-        <div className="text-center max-w-md mx-auto px-4">
-          <div className="bg-gray-800 bg-opacity-40 backdrop-blur-sm rounded-2xl shadow-2xl p-8 border border-gray-600 border-opacity-30">
-            <h2 className="text-2xl font-bold text-white mb-2">Stock Not Found</h2>
-            <p className="text-gray-300 mb-6">The stock symbol "{symbol}" could not be found.</p>
-            <button
-              onClick={() => navigate(-1)}
-              className="w-full bg-gradient-to-r from-purple-500 to-cyan-500 text-white font-medium py-3 px-4 rounded-xl hover:from-purple-600 hover:to-cyan-600 transition-all duration-200"
-            >
-              Go Back
-            </button>
-          </div>
         </div>
       </div>
     );
@@ -290,44 +207,162 @@ const StockDetails = () => {
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
           {/* Chart Section */}
           <div className="lg:col-span-3 space-y-6">
-            {/* Chart Container */}
-            <div className="bg-gray-800 bg-opacity-40 backdrop-blur-sm rounded-2xl shadow-2xl p-6 border border-gray-600 border-opacity-30">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-bold text-white">Price Chart</h2>
-                
-                {/* Timeframe Selector */}
-                <div className="flex space-x-1">
-                  {['1D', '1W', '1M', '1Y'].map((tf) => (
-                    <button
-                      key={tf}
-                      onClick={() => setTimeframe(tf)}
-                      className={`px-3 py-1 rounded-lg text-sm font-medium transition-all duration-200 ${
-                        timeframe === tf
-                          ? 'bg-gradient-to-r from-purple-500 to-cyan-500 text-white'
-                          : 'text-gray-400 hover:text-white bg-gray-700 bg-opacity-30'
-                      }`}
-                    >
-                      {tf}
-                    </button>
-                  ))}
-                </div>
+            {/* Chart Controls */}
+            <div className="flex items-center justify-between">
+              <div className="flex space-x-1">
+                {['1D', '1W', '1M', '1Y'].map((tf) => (
+                  <button
+                    key={tf}
+                    onClick={() => setTimeframe(tf)}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                      timeframe === tf
+                        ? 'bg-gradient-to-r from-purple-500 to-cyan-500 text-white'
+                        : 'text-gray-300 hover:text-white bg-gray-700 bg-opacity-30 hover:bg-opacity-50'
+                    }`}
+                  >
+                    {tf}
+                  </button>
+                ))}
               </div>
               
-              <div ref={chartContainerRef} className="w-full h-96" />
+              <div className="flex space-x-1">
+                {['candlestick', 'line', 'area'].map((type) => (
+                  <button
+                    key={type}
+                    onClick={() => setChartType(type)}
+                    className={`px-3 py-1 rounded-lg text-xs font-medium transition-all duration-200 ${
+                      chartType === type
+                        ? 'bg-white bg-opacity-20 text-white'
+                        : 'text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    {type.charAt(0).toUpperCase() + type.slice(1)}
+                  </button>
+                ))}
+              </div>
             </div>
 
-            {/* Indicators */}
+            {/* Main Price Chart */}
+            <div className="bg-gray-800 bg-opacity-40 backdrop-blur-sm rounded-2xl shadow-2xl p-6 border border-gray-600 border-opacity-30">
+              <div className="h-96">
+                <ResponsiveContainer width="100%" height="100%">
+                  <ComposedChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                    <defs>
+                      <linearGradient id="priceGradient" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#00D4AA" stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor="#00D4AA" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255, 255, 255, 0.1)" />
+                    <XAxis 
+                      dataKey="date" 
+                      stroke="rgba(255, 255, 255, 0.6)" 
+                      fontSize={12}
+                    />
+                    <YAxis 
+                      stroke="rgba(255, 255, 255, 0.6)" 
+                      fontSize={12}
+                      tickFormatter={(value) => `₹${value}`}
+                    />
+                    <Tooltip content={<CustomTooltip />} />
+                    
+                    {chartType === 'area' && (
+                      <Area
+                        type="monotone"
+                        dataKey="close"
+                        stroke="#00D4AA"
+                        strokeWidth={2}
+                        fill="url(#priceGradient)"
+                      />
+                    )}
+                    
+                    {chartType === 'line' && (
+                      <Line
+                        type="monotone"
+                        dataKey="close"
+                        stroke="#00D4AA"
+                        strokeWidth={2}
+                        dot={false}
+                      />
+                    )}
+                    
+                    {chartType === 'candlestick' && (
+                      <>
+                        {/* High-Low lines */}
+                        <Line
+                          type="monotone"
+                          dataKey="high"
+                          stroke="rgba(255, 255, 255, 0.3)"
+                          strokeWidth={1}
+                          dot={false}
+                          connectNulls={false}
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="low"
+                          stroke="rgba(255, 255, 255, 0.3)"
+                          strokeWidth={1}
+                          dot={false}
+                          connectNulls={false}
+                        />
+                        {/* Candlestick bodies */}
+                        <Bar
+                          dataKey="close"
+                          fill={(entry) => entry?.fill || '#00D4AA'}
+                          stroke="none"
+                        />
+                      </>
+                    )}
+                    
+                    {/* SMA20 Line */}
+                    <Line
+                      type="monotone"
+                      dataKey="sma20"
+                      stroke="#FFD700"
+                      strokeWidth={1}
+                      dot={false}
+                      strokeDasharray="5 5"
+                    />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* Volume Chart */}
+            <div className="bg-gray-800 bg-opacity-40 backdrop-blur-sm rounded-2xl shadow-2xl p-6 border border-gray-600 border-opacity-30">
+              <h3 className="text-lg font-bold text-white mb-4">Volume</h3>
+              <div className="h-32">
+                <ResponsiveContainer width="100%" height="100%">
+                  <ComposedChart data={chartData}>
+                    <XAxis dataKey="date" stroke="rgba(255, 255, 255, 0.6)" fontSize={10} />
+                    <YAxis stroke="rgba(255, 255, 255, 0.6)" fontSize={10} />
+                    <Bar
+                      dataKey="volume"
+                      fill="rgba(0, 212, 170, 0.6)"
+                      stroke="none"
+                    />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* Technical Indicators */}
             <div className="bg-gray-800 bg-opacity-40 backdrop-blur-sm rounded-2xl shadow-2xl p-6 border border-gray-600 border-opacity-30">
               <h3 className="text-lg font-bold text-white mb-4">Technical Indicators</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div className="p-4 bg-gray-700 bg-opacity-30 rounded-xl">
                   <p className="text-sm text-gray-300">RSI (14)</p>
-                  <p className="text-2xl font-bold text-white">65.4</p>
+                  <p className="text-2xl font-bold text-white">
+                    {chartData[chartData.length - 1]?.rsi || '65.4'}
+                  </p>
                   <p className="text-xs text-yellow-400">Neutral</p>
                 </div>
                 <div className="p-4 bg-gray-700 bg-opacity-30 rounded-xl">
                   <p className="text-sm text-gray-300">SMA (20)</p>
-                  <p className="text-2xl font-bold text-white">₹2,398</p>
+                  <p className="text-2xl font-bold text-white">
+                    ₹{chartData[chartData.length - 1]?.sma20?.toLocaleString() || '2,398'}
+                  </p>
                   <p className="text-xs text-green-400">Bullish</p>
                 </div>
                 <div className="p-4 bg-gray-700 bg-opacity-30 rounded-xl">
@@ -335,11 +370,20 @@ const StockDetails = () => {
                   <p className="text-2xl font-bold text-white">{stock?.volume}</p>
                   <p className="text-xs text-blue-400">Above Average</p>
                 </div>
+                <div className="p-4 bg-gray-700 bg-opacity-30 rounded-xl">
+                  <p className="text-sm text-gray-300">Day Range</p>
+                  <p className="text-lg font-bold text-white">
+                    ₹{stock?.low} - ₹{stock?.high}
+                  </p>
+                  <p className="text-xs text-purple-400">
+                    Spread: ₹{(stock?.high - stock?.low).toFixed(2)}
+                  </p>
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Trading Panel - Same as before */}
+          {/* Trading Panel */}
           <div className="space-y-6">
             <div className="bg-gray-800 bg-opacity-40 backdrop-blur-sm rounded-2xl shadow-2xl p-6 border border-gray-600 border-opacity-30">
               <h3 className="text-xl font-bold text-white mb-6">Place Order</h3>
@@ -418,6 +462,33 @@ const StockDetails = () => {
                 <p className="text-sm text-blue-200">
                   Available Balance: ₹{user?.balance?.toLocaleString()}
                 </p>
+              </div>
+            </div>
+
+            {/* Quick Stats */}
+            <div className="bg-gray-800 bg-opacity-40 backdrop-blur-sm rounded-2xl shadow-2xl p-6 border border-gray-600 border-opacity-30">
+              <h3 className="text-lg font-bold text-white mb-4">Market Stats</h3>
+              <div className="space-y-3 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-300">Market Cap:</span>
+                  <span className="text-white font-medium">{stock?.marketCap}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-300">P/E Ratio:</span>
+                  <span className="text-white font-medium">{stock?.pe}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-300">EPS:</span>
+                  <span className="text-white font-medium">₹{stock?.eps}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-300">52W High:</span>
+                  <span className="text-green-400 font-medium">₹{(stock?.price * 1.15).toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-300">52W Low:</span>
+                  <span className="text-red-400 font-medium">₹{(stock?.price * 0.75).toFixed(2)}</span>
+                </div>
               </div>
             </div>
           </div>
