@@ -1,93 +1,166 @@
 const express = require('express');
-const auth = require('../middleware/auth');
+const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const Order = require('../models/Order');
 
 const router = express.Router();
 
-// Place order
-router.post('/', auth, async (req, res) => {
+// Middleware to authenticate user
+const authenticateToken = (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) {
+    return res.status(401).json({ message: 'Access token required' });
+  }
+
+  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+    if (err) {
+      return res.status(403).json({ message: 'Invalid token' });
+    }
+    req.userId = user.userId;
+    next();
+  });
+};
+
+// Place a new order (Buy/Sell)
+router.post('/', authenticateToken, async (req, res) => {
   try {
-    const { symbol, companyName, type, quantity, price, orderType } = req.body;
-    const userId = req.user._id;
-    
-    const totalAmount = price * quantity;
-    
-    // Get user
-    const user = await User.findById(userId);
-    
-    if (type === 'BUY') {
-      if (user.balance < totalAmount) {
+    const { symbol, type, quantity, price } = req.body;
+
+    console.log('Order request:', { symbol, type, quantity, price, userId: req.userId });
+
+    // Validation
+    if (!symbol || !type || !quantity || !price) {
+      return res.status(400).json({ message: 'Missing required fields' });
+    }
+
+    if (type !== 'buy' && type !== 'sell') {
+      return res.status(400).json({ message: 'Order type must be buy or sell' });
+    }
+
+    if (quantity <= 0) {
+      return res.status(400).json({ message: 'Quantity must be greater than 0' });
+    }
+
+    // Find user
+    const user = await User.findById(req.userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const totalCost = price * quantity;
+
+    if (type === 'buy') {
+      // Check if user has enough balance
+      if (user.balance < totalCost) {
         return res.status(400).json({ message: 'Insufficient balance' });
       }
-      
+
       // Deduct balance
-      user.balance -= totalAmount;
-      
-      // Update portfolio
-      const existingHolding = user.portfolio.find(p => p.symbol === symbol);
+      user.balance -= totalCost;
+      await user.save();
+
+      // Add to portfolio (or update existing holding)
+      if (!user.portfolio) {
+        user.portfolio = [];
+      }
+
+      const existingHolding = user.portfolio.find(item => item.symbol === symbol);
       if (existingHolding) {
         const totalShares = existingHolding.quantity + quantity;
-        const totalValue = (existingHolding.avgPrice * existingHolding.quantity) + totalAmount;
-        existingHolding.avgPrice = totalValue / totalShares;
+        const totalValue = (existingHolding.quantity * existingHolding.buyPrice) + totalCost;
         existingHolding.quantity = totalShares;
+        existingHolding.buyPrice = totalValue / totalShares; // Average price
       } else {
         user.portfolio.push({
           symbol,
-          companyName,
           quantity,
-          avgPrice: price,
+          buyPrice: price,
           currentPrice: price
         });
       }
-    } else if (type === 'SELL') {
-      const holding = user.portfolio.find(p => p.symbol === symbol);
+
+      await user.save();
+    } else {
+      // Sell order - check if user has enough shares
+      if (!user.portfolio) {
+        return res.status(400).json({ message: 'No holdings to sell' });
+      }
+
+      const holding = user.portfolio.find(item => item.symbol === symbol);
       if (!holding || holding.quantity < quantity) {
         return res.status(400).json({ message: 'Insufficient shares to sell' });
       }
-      
-      // Add balance
-      user.balance += totalAmount;
-      
+
       // Update portfolio
-      holding.quantity -= quantity;
-      if (holding.quantity === 0) {
-        user.portfolio = user.portfolio.filter(p => p.symbol !== symbol);
+      if (holding.quantity === quantity) {
+        user.portfolio = user.portfolio.filter(item => item.symbol !== symbol);
+      } else {
+        holding.quantity -= quantity;
       }
+
+      // Add to balance
+      user.balance += totalCost;
+      await user.save();
     }
-    
-    await user.save();
-    
+
     // Create order record
     const order = new Order({
-      userId,
+      userId: req.userId,
       symbol,
-      companyName,
       type,
       quantity,
       price,
-      orderType,
-      totalAmount,
-      status: 'EXECUTED'
+      total: totalCost,
+      status: 'completed'
     });
-    
+
     await order.save();
-    
-    res.status(201).json({ message: 'Order executed successfully', order });
+
+    res.status(201).json({
+      message: `${type} order placed successfully`,
+      order: {
+        id: order._id,
+        symbol,
+        type,
+        quantity,
+        price,
+        total: totalCost,
+        status: 'completed'
+      },
+      newBalance: user.balance
+    });
+
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error('Order error:', error);
+    res.status(500).json({ message: 'Internal server error' });
   }
 });
 
 // Get user orders
-router.get('/', auth, async (req, res) => {
+router.get('/', authenticateToken, async (req, res) => {
   try {
-    const orders = await Order.find({ userId: req.user._id })
+    const orders = await Order.find({ userId: req.userId })
       .sort({ createdAt: -1 })
       .limit(50);
-    res.json(orders);
+
+    const formattedOrders = orders.map(order => ({
+      id: order._id,
+      symbol: order.symbol,
+      name: `${order.symbol} Stock`, // You can enhance this with actual company names
+      type: order.type,
+      quantity: order.quantity,
+      price: order.price,
+      total: order.total,
+      status: order.status,
+      date: order.createdAt
+    }));
+
+    res.json(formattedOrders);
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error('Error fetching orders:', error);
+    res.status(500).json({ message: 'Internal server error' });
   }
 });
 
