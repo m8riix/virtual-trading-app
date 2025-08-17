@@ -14,32 +14,38 @@ import StockDetails from './pages/StockDetails';
 import AuthSuccess from './pages/AuthSuccess';
 import axios from 'axios';
 
-// ⭐ ADD THIS LINE - Configure API base URL  
-axios.defaults.baseURL = process.env.REACT_APP_API_URL;
+// Configure API base URL
+axios.defaults.baseURL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
-// Rest of your App component...
+// Debug logging
+console.log('REACT_APP_API_URL:', process.env.REACT_APP_API_URL);
+console.log('Axios baseURL:', axios.defaults.baseURL);
 
 const ProtectedRoute = ({ children }) => {
   const { user, loading } = useAuth();
-  
+
   if (loading) {
-    return <div className="flex items-center justify-center min-h-screen">
-      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-    </div>;
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+      </div>
+    );
   }
-  
+
   return user ? children : <Navigate to="/login" />;
 };
 
 const PublicRoute = ({ children }) => {
   const { user, loading } = useAuth();
-  
+
   if (loading) {
-    return <div className="flex items-center justify-center min-h-screen">
-      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-    </div>;
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+      </div>
+    );
   }
-  
+
   return user ? <Navigate to="/dashboard" /> : children;
 };
 
@@ -49,47 +55,66 @@ function App() {
       <Router>
         <div className="min-h-screen bg-gray-50">
           <Navbar />
-          <main className="container mx-auto px-4 py-8">
-            <Routes>
-              <Route path="/" element={<Navigate to="/dashboard" />} />
-              <Route path="/login" element={
+          <Routes>
+            <Route 
+              path="/login" 
+              element={
                 <PublicRoute>
                   <Login />
                 </PublicRoute>
-              } />
-              <Route path="/register" element={
+              } 
+            />
+            <Route 
+              path="/register" 
+              element={
                 <PublicRoute>
                   <Register />
                 </PublicRoute>
-              } />
-              <Route path="/auth/success" element={<AuthSuccess />} />
-              <Route path="/dashboard" element={
+              } 
+            />
+            <Route path="/auth/success" element={<AuthSuccess />} />
+            <Route 
+              path="/dashboard" 
+              element={
                 <ProtectedRoute>
                   <Dashboard />
                 </ProtectedRoute>
-              } />
-              <Route path="/portfolio" element={
+              } 
+            />
+            <Route 
+              path="/portfolio" 
+              element={
                 <ProtectedRoute>
                   <Portfolio />
                 </ProtectedRoute>
-              } />
-              <Route path="/watchlist" element={
+              } 
+            />
+            <Route 
+              path="/watchlist" 
+              element={
                 <ProtectedRoute>
                   <Watchlist />
                 </ProtectedRoute>
-              } />
-              <Route path="/orders" element={
+              } 
+            />
+            <Route 
+              path="/orders" 
+              element={
                 <ProtectedRoute>
                   <Orders />
                 </ProtectedRoute>
-              } />
-              <Route path="/stock/:symbol" element={
+              } 
+            />
+            <Route 
+              path="/stock/:symbol" 
+              element={
                 <ProtectedRoute>
                   <StockDetails />
                 </ProtectedRoute>
-              } />
-            </Routes>
-          </main>
+              } 
+            />
+            <Route path="/" element={<Navigate to="/dashboard" />} />
+          </Routes>
           <Toaster position="top-right" />
         </div>
       </Router>
@@ -98,5 +123,3 @@ function App() {
 }
 
 export default App;
-
-
