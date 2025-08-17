@@ -51,37 +51,41 @@ router.post('/', authenticateToken, async (req, res) => {
 
     const totalCost = price * quantity;
 
-    if (type === 'buy') {
-      // Check balance
-      if (user.balance < totalCost) {
-        return res.status(400).json({ message: 'Insufficient balance' });
-      }
+if (type === 'buy') {
+  // Check balance
+  if (user.balance < totalCost) {
+    return res.status(400).json({ message: 'Insufficient balance' });
+  }
 
-      // Deduct balance
-      user.balance -= totalCost;
+  // Deduct balance
+  user.balance -= totalCost;
 
-      // Initialize portfolio if it doesn't exist
-      if (!user.portfolio) {
-        user.portfolio = [];
-      }
+  // Initialize portfolio if it doesn't exist
+  if (!user.portfolio) {
+    user.portfolio = [];
+  }
 
-      // Update portfolio
-      let holding = user.portfolio.find(h => h.symbol === symbol);
-      if (holding) {
-        const currentTotal = holding.buyPrice * holding.quantity + totalCost;
-        const currentQty = holding.quantity + quantity;
-        holding.buyPrice = currentTotal / currentQty;
-        holding.quantity = currentQty;
-        holding.currentPrice = price;
-      } else {
-        user.portfolio.push({ 
-          symbol, 
-          quantity, 
-          buyPrice: price, 
-          currentPrice: price 
-        });
-      }
-    } else {
+  // Update portfolio - FIXED: Ensure buyPrice is always set
+  let holding = user.portfolio.find(h => h.symbol === symbol);
+  if (holding) {
+    // Update existing holding
+    const currentTotal = (holding.buyPrice * holding.quantity) + totalCost;
+    const newQuantity = holding.quantity + quantity;
+    holding.buyPrice = currentTotal / newQuantity; // Average price
+    holding.quantity = newQuantity;
+    holding.currentPrice = price;
+  } else {
+    // Create new holding - FIXED: Explicitly set all required fields
+    const newHolding = {
+      symbol: symbol,
+      quantity: parseInt(quantity),
+      buyPrice: parseFloat(price),
+      currentPrice: parseFloat(price)
+    };
+    console.log('Creating new portfolio holding:', newHolding);
+    user.portfolio.push(newHolding);
+  }
+} else {
       // Sell logic
       if (!user.portfolio) {
         return res.status(400).json({ message: 'No holdings to sell' });
@@ -164,3 +168,4 @@ router.get('/', authenticateToken, async (req, res) => {
 });
 
 module.exports = router;
+
