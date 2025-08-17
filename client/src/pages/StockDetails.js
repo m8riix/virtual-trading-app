@@ -10,8 +10,7 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  ResponsiveContainer,
-  ReferenceLine
+  ResponsiveContainer
 } from 'recharts';
 import axios from 'axios';
 import toast from 'react-hot-toast';
@@ -24,11 +23,9 @@ const StockDetails = () => {
   const [stock, setStock] = useState(null);
   const [chartData, setChartData] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
   const [quantity, setQuantity] = useState(1);
   const [orderType, setOrderType] = useState('buy');
   const [timeframe, setTimeframe] = useState('1M');
-  const [chartType, setChartType] = useState('candlestick');
 
   useEffect(() => {
     fetchStockDetails();
@@ -39,7 +36,6 @@ const StockDetails = () => {
     try {
       const response = await axios.get(`/api/stocks/details/${symbol}`);
       setStock(response.data);
-      setError(null);
     } catch (error) {
       console.error('Error fetching stock details:', error);
       
@@ -60,25 +56,22 @@ const StockDetails = () => {
         pe: 23.4,
         eps: 105.2
       });
-      setError(null);
     }
   };
 
   const fetchChartData = () => {
-    // Generate realistic mock chart data
     const data = [];
     const basePrice = 2400;
     let currentPrice = basePrice;
     const now = new Date();
     
-    const days = timeframe === '1D' ? 1 : timeframe === '1W' ? 7 : timeframe === '1M' ? 30 : 365;
+    const days = timeframe === '1D' ? 7 : timeframe === '1W' ? 30 : timeframe === '1M' ? 90 : 365;
     
     for (let i = days; i >= 0; i--) {
       const date = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
       
-      // Realistic price movement
-      const trend = Math.sin(i * 0.1) * 5; // Trending component
-      const noise = (Math.random() - 0.5) * 20; // Random noise
+      const trend = Math.sin(i * 0.1) * 5;
+      const noise = (Math.random() - 0.5) * 20;
       currentPrice += trend + noise;
       
       const open = currentPrice;
@@ -87,22 +80,13 @@ const StockDetails = () => {
       const low = Math.min(open, close) - Math.random() * 12;
       const volume = Math.floor(Math.random() * 800000) + 200000;
       
-      // Technical indicators
-      const sma20 = currentPrice + (Math.random() - 0.5) * 10;
-      const rsi = 30 + Math.random() * 40; // RSI between 30-70
-      
       data.push({
         date: date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }),
-        timestamp: date.getTime(),
         open: parseFloat(open.toFixed(2)),
         high: parseFloat(high.toFixed(2)),
         low: parseFloat(low.toFixed(2)),
         close: parseFloat(close.toFixed(2)),
-        volume: volume,
-        sma20: parseFloat(sma20.toFixed(2)),
-        rsi: parseFloat(rsi.toFixed(1)),
-        // Candlestick colors
-        fill: close >= open ? '#00D4AA' : '#FF4976'
+        volume: volume
       });
       
       currentPrice = close;
@@ -125,7 +109,7 @@ const StockDetails = () => {
     }
 
     try {
-      const response = await axios.post('/api/orders', {
+      await axios.post('/api/orders', {
         symbol: stock.symbol,
         type: orderType,
         quantity: parseInt(quantity),
@@ -140,7 +124,6 @@ const StockDetails = () => {
     }
   };
 
-  // Custom tooltip for charts
   const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
@@ -207,46 +190,29 @@ const StockDetails = () => {
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
           {/* Chart Section */}
           <div className="lg:col-span-3 space-y-6">
-            {/* Chart Controls */}
-            <div className="flex items-center justify-between">
-              <div className="flex space-x-1">
-                {['1D', '1W', '1M', '1Y'].map((tf) => (
-                  <button
-                    key={tf}
-                    onClick={() => setTimeframe(tf)}
-                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-                      timeframe === tf
-                        ? 'bg-gradient-to-r from-purple-500 to-cyan-500 text-white'
-                        : 'text-gray-300 hover:text-white bg-gray-700 bg-opacity-30 hover:bg-opacity-50'
-                    }`}
-                  >
-                    {tf}
-                  </button>
-                ))}
-              </div>
-              
-              <div className="flex space-x-1">
-                {['candlestick', 'line', 'area'].map((type) => (
-                  <button
-                    key={type}
-                    onClick={() => setChartType(type)}
-                    className={`px-3 py-1 rounded-lg text-xs font-medium transition-all duration-200 ${
-                      chartType === type
-                        ? 'bg-white bg-opacity-20 text-white'
-                        : 'text-gray-400 hover:text-white'
-                    }`}
-                  >
-                    {type.charAt(0).toUpperCase() + type.slice(1)}
-                  </button>
-                ))}
-              </div>
+            {/* Timeframe Selector */}
+            <div className="flex space-x-1">
+              {['1D', '1W', '1M', '1Y'].map((tf) => (
+                <button
+                  key={tf}
+                  onClick={() => setTimeframe(tf)}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                    timeframe === tf
+                      ? 'bg-gradient-to-r from-purple-500 to-cyan-500 text-white'
+                      : 'text-gray-300 hover:text-white bg-gray-700 bg-opacity-30 hover:bg-opacity-50'
+                  }`}
+                >
+                  {tf}
+                </button>
+              ))}
             </div>
 
-            {/* Main Price Chart */}
+            {/* Main Chart */}
             <div className="bg-gray-800 bg-opacity-40 backdrop-blur-sm rounded-2xl shadow-2xl p-6 border border-gray-600 border-opacity-30">
+              <h2 className="text-xl font-bold text-white mb-4">Price Chart</h2>
               <div className="h-96">
                 <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                  <ComposedChart data={chartData}>
                     <defs>
                       <linearGradient id="priceGradient" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor="#00D4AA" stopOpacity={0.3}/>
@@ -255,74 +221,16 @@ const StockDetails = () => {
                     </defs>
                     
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255, 255, 255, 0.1)" />
-                    <XAxis 
-                      dataKey="date" 
-                      stroke="rgba(255, 255, 255, 0.6)" 
-                      fontSize={12}
-                    />
-                    <YAxis 
-                      stroke="rgba(255, 255, 255, 0.6)" 
-                      fontSize={12}
-                      tickFormatter={(value) => `₹${value}`}
-                    />
+                    <XAxis dataKey="date" stroke="rgba(255, 255, 255, 0.6)" fontSize={12} />
+                    <YAxis stroke="rgba(255, 255, 255, 0.6)" fontSize={12} tickFormatter={(value) => `₹${value}`} />
                     <Tooltip content={<CustomTooltip />} />
                     
-                    {chartType === 'area' && (
-                      <Area
-                        type="monotone"
-                        dataKey="close"
-                        stroke="#00D4AA"
-                        strokeWidth={2}
-                        fill="url(#priceGradient)"
-                      />
-                    )}
-                    
-                    {chartType === 'line' && (
-                      <Line
-                        type="monotone"
-                        dataKey="close"
-                        stroke="#00D4AA"
-                        strokeWidth={2}
-                        dot={false}
-                      />
-                    )}
-                    
-                    {chartType === 'candlestick' && (
-                      <>
-                        {/* High-Low lines */}
-                        <Line
-                          type="monotone"
-                          dataKey="high"
-                          stroke="rgba(255, 255, 255, 0.3)"
-                          strokeWidth={1}
-                          dot={false}
-                          connectNulls={false}
-                        />
-                        <Line
-                          type="monotone"
-                          dataKey="low"
-                          stroke="rgba(255, 255, 255, 0.3)"
-                          strokeWidth={1}
-                          dot={false}
-                          connectNulls={false}
-                        />
-                        {/* Candlestick bodies */}
-                        <Bar
-                          dataKey="close"
-                          fill={(entry) => entry?.fill || '#00D4AA'}
-                          stroke="none"
-                        />
-                      </>
-                    )}
-                    
-                    {/* SMA20 Line */}
-                    <Line
+                    <Area
                       type="monotone"
-                      dataKey="sma20"
-                      stroke="#FFD700"
-                      strokeWidth={1}
-                      dot={false}
-                      strokeDasharray="5 5"
+                      dataKey="close"
+                      stroke="#00D4AA"
+                      strokeWidth={2}
+                      fill="url(#priceGradient)"
                     />
                   </ComposedChart>
                 </ResponsiveContainer>
@@ -337,48 +245,9 @@ const StockDetails = () => {
                   <ComposedChart data={chartData}>
                     <XAxis dataKey="date" stroke="rgba(255, 255, 255, 0.6)" fontSize={10} />
                     <YAxis stroke="rgba(255, 255, 255, 0.6)" fontSize={10} />
-                    <Bar
-                      dataKey="volume"
-                      fill="rgba(0, 212, 170, 0.6)"
-                      stroke="none"
-                    />
+                    <Bar dataKey="volume" fill="rgba(0, 212, 170, 0.6)" />
                   </ComposedChart>
                 </ResponsiveContainer>
-              </div>
-            </div>
-
-            {/* Technical Indicators */}
-            <div className="bg-gray-800 bg-opacity-40 backdrop-blur-sm rounded-2xl shadow-2xl p-6 border border-gray-600 border-opacity-30">
-              <h3 className="text-lg font-bold text-white mb-4">Technical Indicators</h3>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div className="p-4 bg-gray-700 bg-opacity-30 rounded-xl">
-                  <p className="text-sm text-gray-300">RSI (14)</p>
-                  <p className="text-2xl font-bold text-white">
-                    {chartData[chartData.length - 1]?.rsi || '65.4'}
-                  </p>
-                  <p className="text-xs text-yellow-400">Neutral</p>
-                </div>
-                <div className="p-4 bg-gray-700 bg-opacity-30 rounded-xl">
-                  <p className="text-sm text-gray-300">SMA (20)</p>
-                  <p className="text-2xl font-bold text-white">
-                    ₹{chartData[chartData.length - 1]?.sma20?.toLocaleString() || '2,398'}
-                  </p>
-                  <p className="text-xs text-green-400">Bullish</p>
-                </div>
-                <div className="p-4 bg-gray-700 bg-opacity-30 rounded-xl">
-                  <p className="text-sm text-gray-300">Volume</p>
-                  <p className="text-2xl font-bold text-white">{stock?.volume}</p>
-                  <p className="text-xs text-blue-400">Above Average</p>
-                </div>
-                <div className="p-4 bg-gray-700 bg-opacity-30 rounded-xl">
-                  <p className="text-sm text-gray-300">Day Range</p>
-                  <p className="text-lg font-bold text-white">
-                    ₹{stock?.low} - ₹{stock?.high}
-                  </p>
-                  <p className="text-xs text-purple-400">
-                    Spread: ₹{(stock?.high - stock?.low).toFixed(2)}
-                  </p>
-                </div>
               </div>
             </div>
           </div>
@@ -388,16 +257,13 @@ const StockDetails = () => {
             <div className="bg-gray-800 bg-opacity-40 backdrop-blur-sm rounded-2xl shadow-2xl p-6 border border-gray-600 border-opacity-30">
               <h3 className="text-xl font-bold text-white mb-6">Place Order</h3>
               
-              {/* Order Type */}
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-300 mb-2">Order Type</label>
                 <div className="flex space-x-2">
                   <button
                     onClick={() => setOrderType('buy')}
                     className={`flex-1 py-2 px-4 rounded-lg font-medium transition-all duration-200 ${
-                      orderType === 'buy'
-                        ? 'bg-green-600 text-white'
-                        : 'bg-gray-700 bg-opacity-50 text-gray-300 hover:bg-opacity-70'
+                      orderType === 'buy' ? 'bg-green-600 text-white' : 'bg-gray-700 bg-opacity-50 text-gray-300 hover:bg-opacity-70'
                     }`}
                   >
                     Buy
@@ -405,9 +271,7 @@ const StockDetails = () => {
                   <button
                     onClick={() => setOrderType('sell')}
                     className={`flex-1 py-2 px-4 rounded-lg font-medium transition-all duration-200 ${
-                      orderType === 'sell'
-                        ? 'bg-red-600 text-white'
-                        : 'bg-gray-700 bg-opacity-50 text-gray-300 hover:bg-opacity-70'
+                      orderType === 'sell' ? 'bg-red-600 text-white' : 'bg-gray-700 bg-opacity-50 text-gray-300 hover:bg-opacity-70'
                     }`}
                   >
                     Sell
@@ -415,7 +279,6 @@ const StockDetails = () => {
                 </div>
               </div>
 
-              {/* Quantity */}
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-300 mb-2">Quantity</label>
                 <input
@@ -423,11 +286,10 @@ const StockDetails = () => {
                   min="1"
                   value={quantity}
                   onChange={(e) => setQuantity(e.target.value)}
-                  className="w-full px-4 py-3 bg-gray-700 bg-opacity-50 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                  className="w-full px-4 py-3 bg-gray-700 bg-opacity-50 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
 
-              {/* Order Summary */}
               <div className="mb-6 p-4 bg-gray-700 bg-opacity-30 rounded-lg">
                 <div className="flex justify-between text-sm text-gray-300 mb-2">
                   <span>Price per share:</span>
@@ -445,7 +307,6 @@ const StockDetails = () => {
                 </div>
               </div>
 
-              {/* Place Order Button */}
               <button
                 onClick={handleOrder}
                 className={`w-full py-3 px-4 rounded-xl font-medium transition-all duration-200 transform hover:scale-[1.02] ${
@@ -457,38 +318,10 @@ const StockDetails = () => {
                 {orderType === 'buy' ? 'Buy Now' : 'Sell Now'}
               </button>
 
-              {/* Balance Info */}
               <div className="mt-4 p-3 bg-blue-500 bg-opacity-10 border border-blue-500 border-opacity-30 rounded-lg">
                 <p className="text-sm text-blue-200">
                   Available Balance: ₹{user?.balance?.toLocaleString()}
                 </p>
-              </div>
-            </div>
-
-            {/* Quick Stats */}
-            <div className="bg-gray-800 bg-opacity-40 backdrop-blur-sm rounded-2xl shadow-2xl p-6 border border-gray-600 border-opacity-30">
-              <h3 className="text-lg font-bold text-white mb-4">Market Stats</h3>
-              <div className="space-y-3 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-300">Market Cap:</span>
-                  <span className="text-white font-medium">{stock?.marketCap}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-300">P/E Ratio:</span>
-                  <span className="text-white font-medium">{stock?.pe}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-300">EPS:</span>
-                  <span className="text-white font-medium">₹{stock?.eps}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-300">52W High:</span>
-                  <span className="text-green-400 font-medium">₹{(stock?.price * 1.15).toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-300">52W Low:</span>
-                  <span className="text-red-400 font-medium">₹{(stock?.price * 0.75).toFixed(2)}</span>
-                </div>
               </div>
             </div>
           </div>
